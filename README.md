@@ -34,8 +34,10 @@ go get github.com/pakasa-io/uow
 
 ## Quick Start
 
-The module ships a first-party `database/sql` adapter in
-`github.com/pakasa-io/uow/adapters/sql`.
+The module ships first-party adapters for:
+
+- `database/sql` in `github.com/pakasa-io/uow/adapters/sql`
+- GORM in `github.com/pakasa-io/uow/adapters/gorm`
 
 ```go
 package main
@@ -193,6 +195,31 @@ The adapter intentionally does not advertise:
 
 That keeps the capability contract aligned with what `database/sql` can
 guarantee portably.
+
+## First-Party GORM Adapter
+
+The `gormadapter` package expects a registered `*gorm.DB` client and exposes:
+
+- `gormadapter.New(name, options...)` for adapter construction
+- `gormadapter.Current(uow)` to obtain the current `*gorm.DB`
+- `gormadapter.MustCurrent(uow)` for panic-on-miswire repository code
+- `gormadapter.CurrentTx(uow)` for transaction-only paths
+
+By default the GORM adapter is conservative:
+
+- root transactions are supported
+- `ReadOnly` and isolation preferences are passed through `gorm.DB.Begin`
+- nested transactions are reported as unsupported
+
+When the backing dialect supports savepoints reliably, nested strict mode can
+be enabled explicitly:
+
+```go
+adapter := gormadapter.New("gorm", gormadapter.WithNestedSavepoints(true))
+```
+
+This keeps the default capability contract stable across databases while still
+allowing savepoint-backed nesting for deployments that have validated it.
 
 ## Error Model
 
