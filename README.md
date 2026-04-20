@@ -9,6 +9,7 @@ It provides:
 - strict or emulated nested transactions
 - tenant-aware client selection
 - rollback-only semantics
+- native `net/http` and Fiber v2 integration packages
 - interceptor and hook-based observability
 
 The package is designed for service code that should depend on a small,
@@ -38,6 +39,11 @@ The module ships first-party adapters for:
 
 - `database/sql` in `github.com/pakasa-io/uow/adapters/sql`
 - GORM in `github.com/pakasa-io/uow/adapters/gorm`
+
+It also ships first-party framework integration packages for:
+
+- `net/http` in `github.com/pakasa-io/uow/framework/http`
+- Fiber v2 in `github.com/pakasa-io/uow/framework/fiber`
 
 ```go
 package main
@@ -81,6 +87,17 @@ func main() {
 	}
 }
 ```
+
+## Examples
+
+Runnable end-to-end examples live under [examples](/Users/geof/repos/uow/examples/README.md):
+
+- [callbacks](/Users/geof/repos/uow/examples/callbacks/main.go)
+- [http](/Users/geof/repos/uow/examples/http/main.go)
+- [fiber-selective-routes](/Users/geof/repos/uow/examples/fiber-selective-routes/main.go)
+- [gorm](/Users/geof/repos/uow/examples/gorm/main.go)
+- [nested-transactions](/Users/geof/repos/uow/examples/nested-transactions/main.go)
+- [controller-service-repository](/Users/geof/repos/uow/examples/controller-service-repository/main.go)
 
 ## Core Concepts
 
@@ -172,6 +189,86 @@ Optional context helpers:
 - `WithBindingOverride` / `BindingOverrideFrom`
 - `WithTenantID` / `TenantIDFromContext`
 - `ContextTenantPolicy`
+
+## `net/http` Integration
+
+The `httpuow` package provides:
+
+- `httpuow.Middleware(manager, cfg)` for standard middleware composition
+- `httpuow.Wrap(manager, cfg, handler)` for per-route wrapping
+- request-time execution, tenant, and binding override resolution
+- optional status-based rollback policies
+
+Per-route configuration is explicit because each route can be wrapped with its
+own `Config`:
+
+```go
+mux.Handle("/users", httpuow.Wrap(manager, httpuow.Config{
+	Execution: uow.ExecutionConfig{
+		Transactional: uow.TransactionalOn,
+		Label:         "list-users",
+	},
+	ResolveTenant: func(r *http.Request) (string, error) {
+		return r.Header.Get("X-Tenant-ID"), nil
+	},
+	RollbackOnStatus: httpuow.RollbackOn5xx,
+}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	work := uow.MustFrom(r.Context())
+	_ = work.CurrentHandle()
+	w.WriteHeader(http.StatusOK)
+})))
+```
+
+For broader defaults, use the same middleware at the router or subrouter level:
+
+```go
+secured := httpuow.Middleware(manager, httpuow.Config{
+	Execution: uow.ExecutionConfig{Transactional: uow.TransactionalOn},
+})
+```
+
+Status-based rollback is transport policy only. The middleware marks the active
+transaction rollback-only when configured and a matching status code is
+observed.
+
+## Fiber v2 Integration
+
+The `fiberuow` package provides:
+
+- `fiberuow.Middleware(manager, cfg)` for app/group middleware
+- `fiberuow.Wrap(manager, cfg, handler)` for route-specific wrapping
+- tenant and binding override resolution from `*fiber.Ctx`
+- optional rollback by status code and/or returned handler error
+
+Group middleware:
+
+```go
+api := app.Group("/api", fiberuow.Middleware(manager, fiberuow.Config{
+	Execution: uow.ExecutionConfig{Transactional: uow.TransactionalOn},
+	ResolveTenant: func(c *fiber.Ctx) (string, error) {
+		return c.Get("X-Tenant-ID"), nil
+	},
+}))
+```
+
+Per-route override:
+
+```go
+app.Get("/reports/:id", fiberuow.Wrap(manager, fiberuow.Config{
+	Execution: uow.ExecutionConfig{
+		Transactional: uow.TransactionalOn,
+		Label:         "report-detail",
+	},
+	RollbackOnStatus: fiberuow.RollbackOn5xx,
+}, func(c *fiber.Ctx) error {
+	work := uow.MustFrom(c.UserContext())
+	_ = work.CurrentHandle()
+	return c.SendStatus(fiber.StatusOK)
+}))
+```
+
+Fiber middleware uses `c.UserContext()` / `c.SetUserContext(...)` to bridge the
+transport lifecycle into the core `context.Context` propagation model.
 
 ## First-Party `database/sql` Adapter
 
