@@ -90,14 +90,14 @@ func main() {
 
 ## Examples
 
-Runnable end-to-end examples live under [examples](/Users/geof/repos/uow/examples/README.md):
+Runnable end-to-end examples live under [`examples/`](examples/README.md):
 
-- [callbacks](/Users/geof/repos/uow/examples/callbacks/main.go)
-- [http](/Users/geof/repos/uow/examples/http/main.go)
-- [fiber-selective-routes](/Users/geof/repos/uow/examples/fiber-selective-routes/main.go)
-- [gorm](/Users/geof/repos/uow/examples/gorm/main.go)
-- [nested-transactions](/Users/geof/repos/uow/examples/nested-transactions/main.go)
-- [controller-service-repository](/Users/geof/repos/uow/examples/controller-service-repository/main.go)
+- [`callbacks`](examples/callbacks/main.go)
+- [`http`](examples/http/main.go)
+- [`fiber-selective-routes`](examples/fiber-selective-routes/main.go)
+- [`gorm`](examples/gorm/main.go)
+- [`nested-transactions`](examples/nested-transactions/main.go)
+- [`controller-service-repository`](examples/controller-service-repository/main.go)
 
 ## Core Concepts
 
