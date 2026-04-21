@@ -27,6 +27,7 @@ type testAdapter struct {
 	commitCount   int
 	rollbackCount int
 	beginErr      error
+	commitErr     error
 }
 
 func (a *testAdapter) Name() string { return "test" }
@@ -53,7 +54,7 @@ func (a *testAdapter) Commit(ctx context.Context, tx uow.Tx) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.commitCount++
-	return nil
+	return a.commitErr
 }
 
 func (a *testAdapter) Rollback(ctx context.Context, tx uow.Tx) error {
@@ -199,5 +200,27 @@ func TestErrorHandlerRunsOnBeginFailure(t *testing.T) {
 	}
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("unexpected status: %d", rec.Code)
+	}
+}
+
+func TestCommitFailureCanReplaceBufferedSuccessResponse(t *testing.T) {
+	adapter := &testAdapter{commitErr: errors.New("commit failed")}
+	manager := newManager(t, adapter)
+
+	handler := Wrap(manager, Config{
+		Execution: uow.ExecutionConfig{Transactional: uow.TransactionalOn},
+	}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/commit-fail", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("unexpected status: %d", rec.Code)
+	}
+	if adapter.beginCount != 1 || adapter.commitCount != 1 || adapter.rollbackCount != 1 {
+		t.Fatalf("unexpected tx counts: begin=%d commit=%d rollback=%d", adapter.beginCount, adapter.commitCount, adapter.rollbackCount)
 	}
 }

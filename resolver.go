@@ -90,6 +90,9 @@ func mergeExplicitField(request Selector, override Selector, configuredDefault, 
 func (m *Manager) resolveTenant(ctx context.Context, field resolvedField) (tenantChoice, error) {
 	if field.locked {
 		if field.value == "" {
+			if m.cfg.RequireTenantResolution {
+				return tenantChoice{}, withSentinel(ErrKindTenant, ErrTenantNotResolved)
+			}
 			return tenantChoice{explicitNone: true, explicit: true}, nil
 		}
 		return tenantChoice{value: field.value, explicit: true}, nil

@@ -331,6 +331,34 @@ func TestCommitFailureTriggersRollback(t *testing.T) {
 	}
 }
 
+func TestCommitFailurePreservesBeforeRollbackError(t *testing.T) {
+	commitErr := errors.New("commit failed")
+	beforeRollbackErr := errors.New("before rollback failed")
+	adapter := newMockAdapter(Capabilities{RootTransaction: true})
+	adapter.commitFn = func(context.Context, Tx) error { return commitErr }
+	events := []string{}
+	manager := mustManager(t, DefaultConfig(), ManagerOptions{
+		Interceptors: []Interceptor{recordingInterceptor{
+			events:            &events,
+			beforeRollbackErr: beforeRollbackErr,
+		}},
+	}, defaultRegistration(adapter))
+
+	err := manager.InTx(context.Background(), TxConfig{}, func(context.Context) error { return nil })
+	if !errors.Is(err, ErrFinalizationFailed) {
+		t.Fatalf("expected finalization failure, got %v", err)
+	}
+	if !errors.Is(err, commitErr) {
+		t.Fatalf("expected commit error, got %v", err)
+	}
+	if !errors.Is(err, beforeRollbackErr) {
+		t.Fatalf("expected preserved before rollback error, got %v", err)
+	}
+	if len(adapter.rollbacks) != 1 {
+		t.Fatalf("expected compensating rollback, got %v", adapter.rollbacks)
+	}
+}
+
 func TestRollbackFailurePreservesCallbackError(t *testing.T) {
 	rollbackErr := errors.New("rollback failed")
 	adapter := newMockAdapter(Capabilities{RootTransaction: true})
@@ -506,6 +534,21 @@ func TestTenantResolutionPrecedenceAndFallback(t *testing.T) {
 			Registration{Adapter: sharedAdapter, AdapterName: "mock", Client: "shared", ClientName: "shared", Default: true},
 		)
 		_, err := manager.ResolveBinding(context.Background(), ResolutionRequest{Mode: ResolutionAmbient})
+		if !errors.Is(err, ErrTenantNotResolved) {
+			t.Fatalf("expected tenant not resolved, got %v", err)
+		}
+	})
+
+	t.Run("tenant required rejects explicit non-tenant selection", func(t *testing.T) {
+		cfg := DefaultConfig()
+		cfg.RequireTenantResolution = true
+		manager := mustManager(t, cfg, ManagerOptions{TenantPolicy: ContextTenantPolicy{}},
+			Registration{Adapter: sharedAdapter, AdapterName: "mock", Client: "shared", ClientName: "shared", Default: true},
+		)
+		_, err := manager.ResolveBinding(context.Background(), ResolutionRequest{
+			Mode:     ResolutionAmbient,
+			TenantID: Selector{Set: true, Value: ""},
+		})
 		if !errors.Is(err, ErrTenantNotResolved) {
 			t.Fatalf("expected tenant not resolved, got %v", err)
 		}

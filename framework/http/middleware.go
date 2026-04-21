@@ -2,6 +2,7 @@ package httpuow
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -43,12 +44,17 @@ func serve(manager *uow.Manager, cfg Config, next http.Handler, w http.ResponseW
 
 	execCfg, err := cfg.execution(r)
 	if err != nil {
-		cfg.handleError(newResponseRecorder(w), r, err)
+		cfg.handleError(w, r, err, http.StatusOK, false)
 		return
 	}
 	baseCtx, err = cfg.decorateContext(baseCtx, r)
 	if err != nil {
-		cfg.handleError(newResponseRecorder(w), r, err)
+		cfg.handleError(w, r, err, http.StatusOK, false)
+		return
+	}
+
+	if execCfg.Transactional != uow.TransactionalOff {
+		serveBuffered(manager, cfg, execCfg, next, w, r, baseCtx)
 		return
 	}
 
@@ -61,8 +67,24 @@ func serve(manager *uow.Manager, cfg Config, next http.Handler, w http.ResponseW
 		return nil
 	})
 	if runErr != nil {
-		cfg.handleError(recorder, r, runErr)
+		cfg.handleError(recorder, r, runErr, recorder.StatusCode(), recorder.Started())
 	}
+}
+
+func serveBuffered(manager *uow.Manager, cfg Config, execCfg uow.ExecutionConfig, next http.Handler, w http.ResponseWriter, r *http.Request, baseCtx context.Context) {
+	buffered := newBufferedResponse()
+	runErr := manager.Do(baseCtx, execCfg, func(execCtx context.Context) error {
+		next.ServeHTTP(buffered, r.WithContext(execCtx))
+		if cfg.RollbackOnStatus != nil && cfg.RollbackOnStatus(buffered.StatusCode()) {
+			return markRollbackOnly(execCtx, buffered.StatusCode())
+		}
+		return nil
+	})
+	if runErr != nil {
+		cfg.handleError(w, r, runErr, buffered.StatusCode(), false)
+		return
+	}
+	buffered.FlushTo(w)
 }
 
 func markRollbackOnly(ctx context.Context, statusCode int) error {
@@ -162,4 +184,58 @@ func (r *responseRecorder) StatusCode() int {
 
 func (r *responseRecorder) Started() bool {
 	return r.wroteHeader || r.written > 0
+}
+
+type bufferedResponse struct {
+	header      http.Header
+	body        bytes.Buffer
+	statusCode  int
+	wroteHeader bool
+}
+
+func newBufferedResponse() *bufferedResponse {
+	return &bufferedResponse{
+		header:     make(http.Header),
+		statusCode: http.StatusOK,
+	}
+}
+
+func (b *bufferedResponse) Header() http.Header {
+	return b.header
+}
+
+func (b *bufferedResponse) WriteHeader(statusCode int) {
+	if b.wroteHeader {
+		return
+	}
+	b.statusCode = statusCode
+	b.wroteHeader = true
+}
+
+func (b *bufferedResponse) Write(data []byte) (int, error) {
+	if !b.wroteHeader {
+		b.WriteHeader(http.StatusOK)
+	}
+	return b.body.Write(data)
+}
+
+func (b *bufferedResponse) StatusCode() int {
+	return b.statusCode
+}
+
+func (b *bufferedResponse) FlushTo(w http.ResponseWriter) {
+	copyHeaders(w.Header(), b.header)
+	w.WriteHeader(b.statusCode)
+	if b.body.Len() == 0 {
+		return
+	}
+	_, _ = w.Write(b.body.Bytes())
+}
+
+func copyHeaders(dst, src http.Header) {
+	for key, values := range src {
+		copied := make([]string, len(values))
+		copy(copied, values)
+		dst[key] = copied
+	}
 }

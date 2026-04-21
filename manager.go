@@ -565,10 +565,13 @@ func rollbackSecondaryError(outcome rollbackOutcome) error {
 
 func commitFailureError(commitErr error, rollback rollbackOutcome) error {
 	if rollback.err != nil {
-		return withSentinel(ErrKindTransaction, ErrFinalizationFailed, commitErr, rollback.err)
+		return withSentinel(ErrKindTransaction, ErrFinalizationFailed, commitErr, rollback.err, rollback.beforeErr, rollback.attemptErr)
+	}
+	if rollback.attemptErr == nil && rollback.beforeErr == nil {
+		return withSentinel(ErrKindTransaction, ErrCommitAborted, commitErr)
 	}
 	if rollback.attemptErr == nil {
-		return withSentinel(ErrKindTransaction, ErrCommitAborted, commitErr)
+		return withSentinel(ErrKindTransaction, ErrFinalizationFailed, commitErr, rollback.beforeErr)
 	}
 	return withSentinel(ErrKindTransaction, ErrFinalizationFailed, commitErr, rollback.beforeErr, rollback.attemptErr)
 }

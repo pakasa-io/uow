@@ -231,6 +231,10 @@ Status-based rollback is transport policy only. The middleware marks the active
 transaction rollback-only when configured and a matching status code is
 observed.
 
+Transactional `net/http` routes are response-buffered until finalization so a
+commit failure can still produce an error response. Streaming or hijacked
+responses should run with `TransactionalOff`.
+
 ## Fiber v2 Integration
 
 The `fiberuow` package provides:

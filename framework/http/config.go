@@ -59,17 +59,17 @@ func (c Config) decorateContext(ctx context.Context, r *http.Request) (context.C
 	return ctx, nil
 }
 
-func (c Config) handleError(rec *responseRecorder, r *http.Request, err error) {
+func (c Config) handleError(w http.ResponseWriter, r *http.Request, err error, statusCode int, started bool) {
 	handler := c.ErrorHandler
 	if handler == nil {
 		handler = DefaultErrorHandler
 	}
 	handler(ErrorContext{
-		ResponseWriter: rec,
+		ResponseWriter: w,
 		Request:        r,
 		Err:            err,
-		StatusCode:     rec.StatusCode(),
-		Started:        rec.Started(),
+		StatusCode:     statusCode,
+		Started:        started,
 	})
 }
 
