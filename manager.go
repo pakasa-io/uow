@@ -136,6 +136,9 @@ func (m *Manager) Bind(ctx context.Context, cfg ExecutionConfig) (context.Contex
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if err := cfg.Validate(); err != nil {
+		return ctx, nil, err
+	}
 	binding, err := m.ResolveBinding(ctx, requestFromExecution(cfg))
 	if err != nil {
 		return ctx, nil, err
@@ -157,6 +160,9 @@ func (m *Manager) Do(ctx context.Context, cfg ExecutionConfig, fn func(ctx conte
 	if fn == nil {
 		return classifyError(ErrKindConfig, errNilCallback)
 	}
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
 	if m.shouldStartTransaction(cfg) {
 		return m.executeManagedRoot(ctx, requestFromExecution(cfg), beginOptionsFromExecution(cfg), fn)
 	}
@@ -171,6 +177,9 @@ func (m *Manager) Do(ctx context.Context, cfg ExecutionConfig, fn func(ctx conte
 func (m *Manager) InTx(ctx context.Context, cfg TxConfig, fn func(ctx context.Context) error) error {
 	if fn == nil {
 		return classifyError(ErrKindConfig, errNilCallback)
+	}
+	if err := cfg.Validate(); err != nil {
+		return err
 	}
 	return m.executeManagedRoot(ctx, requestFromTx(cfg), beginOptionsFromTx(cfg), fn)
 }

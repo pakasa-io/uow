@@ -2,6 +2,8 @@ package uow
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -73,11 +75,33 @@ const (
 
 // Selector represents an optional explicit binding selection.
 //
-// Set=false means the field is unspecified.
-// Set=true with Value="" means "explicitly use the default/non-tenant choice".
+// The zero value leaves the selector unspecified. A set selector with an empty
+// value explicitly requests the default or non-tenant choice for that field.
+// Use Select to lock a concrete value, DefaultSelection to request the default
+// selection explicitly, and NoTenant as a clearer tenant-specific alias for an
+// explicit empty selection.
 type Selector struct {
 	Set   bool
 	Value string
+}
+
+// Select returns a Selector locked to one trimmed value.
+func Select(value string) Selector {
+	return Selector{Set: true, Value: strings.TrimSpace(value)}
+}
+
+// DefaultSelection returns a Selector that explicitly chooses the default
+// binding for adapter or client resolution.
+func DefaultSelection() Selector {
+	return Selector{Set: true}
+}
+
+// NoTenant returns a Selector that explicitly opts out of tenant selection.
+//
+// It is equivalent to DefaultSelection but reads more clearly when used for
+// tenant selectors.
+func NoTenant() Selector {
+	return DefaultSelection()
 }
 
 // BindingInfo exposes resolved execution metadata without backend objects.
@@ -148,6 +172,9 @@ type BindingOverride struct {
 }
 
 // ExecutionConfig controls managed ambient execution.
+//
+// The zero value leaves binding selection unspecified, inherits the Manager's
+// ambient transaction mode, and requests default backend transaction options.
 type ExecutionConfig struct {
 	AdapterName    Selector
 	ClientName     Selector
@@ -159,7 +186,20 @@ type ExecutionConfig struct {
 	Label          string
 }
 
+// Validate validates an ambient execution configuration.
+func (c ExecutionConfig) Validate() error {
+	switch c.Transactional {
+	case TransactionalInherit, TransactionalOff, TransactionalOn:
+	default:
+		return classifyError(ErrKindConfig, fmt.Errorf("uow: invalid transactional mode %d", c.Transactional))
+	}
+	return validateSharedTxOptions(c.IsolationLevel, c.Timeout)
+}
+
 // TxConfig controls explicit root transaction execution.
+//
+// The zero value selects the default binding and starts a read-write root
+// transaction with default backend options.
 type TxConfig struct {
 	AdapterName    Selector
 	ClientName     Selector
@@ -168,6 +208,11 @@ type TxConfig struct {
 	IsolationLevel IsolationLevel
 	Timeout        time.Duration
 	Label          string
+}
+
+// Validate validates an explicit root transaction configuration.
+func (c TxConfig) Validate() error {
+	return validateSharedTxOptions(c.IsolationLevel, c.Timeout)
 }
 
 // FinalizeInput is passed to a root finalization policy.
@@ -258,6 +303,10 @@ type BindingResolver interface {
 }
 
 // UnitOfWork is the application-facing execution-scoped transaction facade.
+//
+// Implementations are safe for concurrent use within one execution, but remain
+// execution-scoped values and should not be reused after their owning request
+// or job has completed.
 type UnitOfWork interface {
 	Binding() BindingInfo
 
@@ -291,4 +340,25 @@ type TxScope interface {
 type Executor interface {
 	InTx(ctx context.Context, cfg TxConfig, fn func(ctx context.Context) error) error
 	InNestedTx(ctx context.Context, opts NestedOptions, fn func(ctx context.Context) error) error
+}
+
+func validateSharedTxOptions(isolation IsolationLevel, timeout time.Duration) error {
+	if err := validateIsolationLevel(isolation); err != nil {
+		return err
+	}
+	if timeout < 0 {
+		return classifyError(ErrKindConfig, fmt.Errorf("uow: timeout must be >= 0"))
+	}
+	return nil
+}
+
+func validateIsolationLevel(level IsolationLevel) error {
+	switch level {
+	case "":
+		return nil
+	case IsolationReadUncommitted, IsolationReadCommitted, IsolationRepeatableRead, IsolationSnapshot, IsolationSerializable:
+		return nil
+	default:
+		return classifyError(ErrKindConfig, fmt.Errorf("uow: invalid isolation level %q", level))
+	}
 }

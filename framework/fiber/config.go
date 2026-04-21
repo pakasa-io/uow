@@ -22,11 +22,31 @@ type Config struct {
 	ErrorHandler           ErrorHandler
 }
 
-func (c Config) execution(ctx *fiber.Ctx) (uow.ExecutionConfig, error) {
+// Validate validates the static portion of the Fiber integration config.
+//
+// When ResolveExecution is set, execution settings are validated per request.
+func (c Config) Validate() error {
 	if c.ResolveExecution != nil {
-		return c.ResolveExecution(ctx)
+		return nil
 	}
-	return c.Execution, nil
+	return c.Execution.Validate()
+}
+
+func (c Config) execution(ctx *fiber.Ctx) (uow.ExecutionConfig, error) {
+	var execCfg uow.ExecutionConfig
+	if c.ResolveExecution != nil {
+		var err error
+		execCfg, err = c.ResolveExecution(ctx)
+		if err != nil {
+			return uow.ExecutionConfig{}, err
+		}
+	} else {
+		execCfg = c.Execution
+	}
+	if err := execCfg.Validate(); err != nil {
+		return uow.ExecutionConfig{}, err
+	}
+	return execCfg, nil
 }
 
 func (c Config) decorateContext(ctx context.Context, cctx *fiber.Ctx) (context.Context, error) {
