@@ -485,10 +485,10 @@ func TestInNestedTxWithoutRootFails(t *testing.T) {
 func TestExplicitBindingOverrideConflict(t *testing.T) {
 	manager := mustManager(t, DefaultConfig(), ManagerOptions{}, defaultRegistration(newMockAdapter(Capabilities{RootTransaction: true})))
 	ctx := WithBindingOverride(context.Background(), BindingOverride{
-		ClientName: Selector{Set: true, Value: "override"},
+		ClientName: SelectClient("override"),
 	})
 	err := manager.InTx(ctx, TxConfig{
-		ClientName: Selector{Set: true, Value: "explicit"},
+		ClientName: SelectClient("explicit"),
 	}, func(ctx context.Context) error { return nil })
 	if !errors.Is(err, ErrBindingOverrideConflict) {
 		t.Fatalf("expected binding override conflict, got %v", err)
@@ -547,7 +547,7 @@ func TestTenantResolutionPrecedenceAndFallback(t *testing.T) {
 		)
 		_, err := manager.ResolveBinding(context.Background(), ResolutionRequest{
 			Mode:     ResolutionAmbient,
-			TenantID: Selector{Set: true, Value: ""},
+			TenantID: NoTenant(),
 		})
 		if !errors.Is(err, ErrTenantNotResolved) {
 			t.Fatalf("expected tenant not resolved, got %v", err)
@@ -562,13 +562,13 @@ func TestMultipleBindingsRejected(t *testing.T) {
 		Registration{Adapter: adapter, AdapterName: "mock", Client: "analytics-client", ClientName: "analytics"},
 	)
 	ctx, _, err := manager.Bind(context.Background(), ExecutionConfig{
-		ClientName: Selector{Set: true, Value: "primary"},
+		ClientName: SelectClient("primary"),
 	})
 	if err != nil {
 		t.Fatalf("Bind: %v", err)
 	}
 	err = manager.InTx(ctx, TxConfig{
-		ClientName: Selector{Set: true, Value: "analytics"},
+		ClientName: SelectClient("analytics"),
 	}, func(ctx context.Context) error { return nil })
 	if !errors.Is(err, ErrMultipleRootBindingsForbidden) {
 		t.Fatalf("expected multiple root bindings forbidden, got %v", err)

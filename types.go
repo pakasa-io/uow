@@ -86,9 +86,21 @@ type Selector struct {
 }
 
 // Select returns a Selector locked to one trimmed value.
+//
+// Prefer SelectAdapter, SelectClient, or SelectTenant when the target field is
+// known — they communicate intent at the call site.
 func Select(value string) Selector {
 	return Selector{Set: true, Value: strings.TrimSpace(value)}
 }
+
+// SelectAdapter returns a Selector that explicitly chooses a named adapter.
+func SelectAdapter(name string) Selector { return Select(name) }
+
+// SelectClient returns a Selector that explicitly chooses a named client.
+func SelectClient(name string) Selector { return Select(name) }
+
+// SelectTenant returns a Selector that explicitly chooses a named tenant.
+func SelectTenant(id string) Selector { return Select(id) }
 
 // DefaultSelection returns a Selector that explicitly chooses the default
 // binding for adapter or client resolution.

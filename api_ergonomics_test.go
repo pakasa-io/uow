@@ -31,6 +31,30 @@ func TestSelectorHelpers(t *testing.T) {
 			t.Fatalf("NoTenant() = %+v, want %+v", got, want)
 		}
 	})
+
+	t.Run("SelectAdapter trims and locks an adapter name", func(t *testing.T) {
+		got := SelectAdapter(" gorm ")
+		want := Selector{Set: true, Value: "gorm"}
+		if got != want {
+			t.Fatalf("SelectAdapter() = %+v, want %+v", got, want)
+		}
+	})
+
+	t.Run("SelectClient trims and locks a client name", func(t *testing.T) {
+		got := SelectClient(" primary ")
+		want := Selector{Set: true, Value: "primary"}
+		if got != want {
+			t.Fatalf("SelectClient() = %+v, want %+v", got, want)
+		}
+	})
+
+	t.Run("SelectTenant trims and locks a tenant id", func(t *testing.T) {
+		got := SelectTenant(" acme ")
+		want := Selector{Set: true, Value: "acme"}
+		if got != want {
+			t.Fatalf("SelectTenant() = %+v, want %+v", got, want)
+		}
+	})
 }
 
 func TestExecutionConfigValidate(t *testing.T) {
