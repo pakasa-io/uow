@@ -77,7 +77,9 @@ func main() {
 		panic(err)
 	}
 
-	err = manager.InTx(context.Background(), uow.TxConfig{}, func(ctx context.Context) error {
+	err = manager.InTx(context.Background(), uow.RootTx(
+		uow.WithLabel("bootstrap"),
+	), func(ctx context.Context) error {
 		current := sqladapter.MustCurrent(uow.MustFrom(ctx))
 		fmt.Printf("%T\n", current)
 		return nil
@@ -86,6 +88,28 @@ func main() {
 		panic(err)
 	}
 }
+```
+
+`ExecutionConfig` and `TxConfig` remain available as plain structs. When you
+want additive construction instead of editing struct literals, use `Exec(...)`
+for ambient execution and `RootTx(...)` for explicit root transactions:
+
+```go
+execCfg := uow.Exec(
+	uow.WithClient("primary"),
+	uow.WithTransactional(uow.TransactionalOn),
+	uow.WithReadOnly(),
+	uow.WithLabel("reports"),
+)
+
+txCfg, err := uow.TxConfigFromExecution(execCfg)
+if err != nil {
+	panic(err)
+}
+
+err = manager.InTx(context.Background(), txCfg, func(ctx context.Context) error {
+	return nil
+})
 ```
 
 ## Examples

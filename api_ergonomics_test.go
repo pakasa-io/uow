@@ -98,6 +98,96 @@ func TestTxConfigValidate(t *testing.T) {
 	})
 }
 
+func TestExecBuilder(t *testing.T) {
+	got := Exec(
+		WithAdapter(" sql "),
+		WithClient(" primary "),
+		WithTenant(" acme "),
+		WithTransactional(TransactionalOn),
+		WithReadOnly(),
+		WithIsolation(IsolationSerializable),
+		WithTimeout(5*time.Second),
+		WithLabel(" reports "),
+	)
+
+	want := ExecutionConfig{
+		AdapterName:    SelectAdapter("sql"),
+		ClientName:     SelectClient("primary"),
+		TenantID:       SelectTenant("acme"),
+		Transactional:  TransactionalOn,
+		ReadOnly:       true,
+		IsolationLevel: IsolationSerializable,
+		Timeout:        5 * time.Second,
+		Label:          "reports",
+	}
+	if got != want {
+		t.Fatalf("Exec() = %+v, want %+v", got, want)
+	}
+}
+
+func TestTxBuilder(t *testing.T) {
+	got := RootTx(
+		WithAdapter(" sql "),
+		WithClientSelector(DefaultSelection()),
+		WithTenantSelector(NoTenant()),
+		WithReadOnly(),
+		WithIsolation(IsolationSnapshot),
+		WithTimeout(3*time.Second),
+		WithLabel(" reports "),
+	)
+
+	want := TxConfig{
+		AdapterName:    SelectAdapter("sql"),
+		ClientName:     DefaultSelection(),
+		TenantID:       NoTenant(),
+		ReadOnly:       true,
+		IsolationLevel: IsolationSnapshot,
+		Timeout:        3 * time.Second,
+		Label:          "reports",
+	}
+	if got != want {
+		t.Fatalf("RootTx() = %+v, want %+v", got, want)
+	}
+}
+
+func TestTxConfigFromExecution(t *testing.T) {
+	t.Run("copies shared fields from ambient config", func(t *testing.T) {
+		got, err := TxConfigFromExecution(ExecutionConfig{
+			AdapterName:    SelectAdapter("gorm"),
+			ClientName:     SelectClient("primary"),
+			TenantID:       SelectTenant("acme"),
+			Transactional:  TransactionalOn,
+			ReadOnly:       true,
+			IsolationLevel: IsolationRepeatableRead,
+			Timeout:        2 * time.Second,
+			Label:          "reporting",
+		})
+		if err != nil {
+			t.Fatalf("TxConfigFromExecution() error = %v", err)
+		}
+
+		want := TxConfig{
+			AdapterName:    SelectAdapter("gorm"),
+			ClientName:     SelectClient("primary"),
+			TenantID:       SelectTenant("acme"),
+			ReadOnly:       true,
+			IsolationLevel: IsolationRepeatableRead,
+			Timeout:        2 * time.Second,
+			Label:          "reporting",
+		}
+		if got != want {
+			t.Fatalf("TxConfigFromExecution() = %+v, want %+v", got, want)
+		}
+	})
+
+	t.Run("rejects invalid transactional mode before converting", func(t *testing.T) {
+		_, err := TxConfigFromExecution(ExecutionConfig{
+			Transactional: TransactionalMode(99),
+		})
+		assertConfigError(t, err)
+	})
+}
+
 func TestManagerRejectsInvalidExecutionAndTxConfig(t *testing.T) {
 	adapter := newMockAdapter(Capabilities{RootTransaction: true})
 	manager := mustManager(t, DefaultConfig(), ManagerOptions{}, defaultRegistration(adapter))

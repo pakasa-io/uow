@@ -507,39 +507,19 @@ func (m *Manager) logFinalizeFailure(ctx context.Context, msg string, err error)
 }
 
 func requestFromExecution(cfg ExecutionConfig) ResolutionRequest {
-	return ResolutionRequest{
-		Mode:        ResolutionAmbient,
-		AdapterName: cfg.AdapterName,
-		ClientName:  cfg.ClientName,
-		TenantID:    cfg.TenantID,
-	}
+	return cfg.shared().resolutionRequest(ResolutionAmbient)
 }
 
 func requestFromTx(cfg TxConfig) ResolutionRequest {
-	return ResolutionRequest{
-		Mode:        ResolutionExplicit,
-		AdapterName: cfg.AdapterName,
-		ClientName:  cfg.ClientName,
-		TenantID:    cfg.TenantID,
-	}
+	return cfg.shared().resolutionRequest(ResolutionExplicit)
 }
 
 func beginOptionsFromExecution(cfg ExecutionConfig) BeginOptions {
-	return BeginOptions{
-		ReadOnly:       cfg.ReadOnly,
-		IsolationLevel: cfg.IsolationLevel,
-		Timeout:        cfg.Timeout,
-		Label:          cfg.Label,
-	}
+	return cfg.shared().beginOptions()
 }
 
 func beginOptionsFromTx(cfg TxConfig) BeginOptions {
-	return BeginOptions{
-		ReadOnly:       cfg.ReadOnly,
-		IsolationLevel: cfg.IsolationLevel,
-		Timeout:        cfg.Timeout,
-		Label:          cfg.Label,
-	}
+	return cfg.shared().beginOptions()
 }
 
 func hasAssertiveBeginOptions(opts BeginOptions) bool {

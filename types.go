@@ -205,7 +205,7 @@ func (c ExecutionConfig) Validate() error {
 	default:
 		return classifyError(ErrKindConfig, fmt.Errorf("uow: invalid transactional mode %d", c.Transactional))
 	}
-	return validateSharedTxOptions(c.IsolationLevel, c.Timeout)
+	return c.shared().validate()
 }
 
 // TxConfig controls explicit root transaction execution.
@@ -224,7 +224,7 @@ type TxConfig struct {
 
 // Validate validates an explicit root transaction configuration.
 func (c TxConfig) Validate() error {
-	return validateSharedTxOptions(c.IsolationLevel, c.Timeout)
+	return c.shared().validate()
 }
 
 // FinalizeInput is passed to a root finalization policy.
