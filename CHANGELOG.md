@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.1.0
+
+Ergonomics release focused on clearer execution APIs and easier config
+construction.
+
+Highlights:
+
+- added domain-specific selector helpers for adapter, client, and tenant
+  selection
+- improved execution config validation coverage in the core and framework
+  integrations
+- added additive `Exec(...)` and `RootTx(...)` builders plus
+  `TxConfigFromExecution(...)`
+- renamed ambient managed execution from `Do(...)` to `Run(...)` and added
+  `Attach(...)` as a zero-config bind shorthand
+- updated examples and docs to reflect the new preferred API surface
+
 ## v1.0.0
 
 Initial production release.
