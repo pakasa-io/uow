@@ -61,7 +61,7 @@ func main() {
 
 func (c *UserController) CreateUser(ctx context.Context, req CreateUserRequest) error {
 	ctx = uow.WithTenantID(ctx, "tenant_layers")
-	return c.manager.Do(ctx, uow.ExecutionConfig{
+	return c.manager.Run(ctx, uow.ExecutionConfig{
 		Transactional: uow.TransactionalOn,
 		Label:         "controller-create-user",
 	}, func(ctx context.Context) error {

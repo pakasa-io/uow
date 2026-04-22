@@ -46,7 +46,7 @@ func execute(manager *uow.Manager, cfg Config, ctx *fiber.Ctx, next func() error
 	}
 
 	var passthroughErr error
-	runErr := manager.Do(baseCtx, execCfg, func(execCtx context.Context) error {
+	runErr := manager.Run(baseCtx, execCfg, func(execCtx context.Context) error {
 		ctx.SetUserContext(execCtx)
 
 		handlerErr := next()

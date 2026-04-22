@@ -197,9 +197,9 @@ func TestManagerRejectsInvalidExecutionAndTxConfig(t *testing.T) {
 		assertConfigError(t, err)
 	})
 
-	t.Run("Do rejects invalid execution config before running callback", func(t *testing.T) {
+	t.Run("Run rejects invalid execution config before running callback", func(t *testing.T) {
 		called := false
-		err := manager.Do(context.Background(), ExecutionConfig{Transactional: TransactionalMode(99)}, func(ctx context.Context) error {
+		err := manager.Run(context.Background(), ExecutionConfig{Transactional: TransactionalMode(99)}, func(ctx context.Context) error {
 			called = true
 			return nil
 		})

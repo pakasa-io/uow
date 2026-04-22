@@ -132,8 +132,9 @@ Runnable end-to-end examples live under [`examples/`](examples/README.md):
 Use:
 
 - `ResolveInfo` or `ResolveBinding` for owner-side lookup
+- `Attach` to bind a default-resolved non-transactional `UnitOfWork`
 - `Bind` to create a non-transactional execution-scoped `UnitOfWork`
-- `Do` for ambient request/job/command execution
+- `Run` for ambient request/job/command execution
 - `InTx` and `InNestedTx` for explicit transactional execution
 
 ### `UnitOfWork`

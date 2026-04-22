@@ -59,7 +59,7 @@ func serve(manager *uow.Manager, cfg Config, next http.Handler, w http.ResponseW
 	}
 
 	recorder := newResponseRecorder(w)
-	runErr := manager.Do(baseCtx, execCfg, func(execCtx context.Context) error {
+	runErr := manager.Run(baseCtx, execCfg, func(execCtx context.Context) error {
 		next.ServeHTTP(recorder, r.WithContext(execCtx))
 		if cfg.RollbackOnStatus != nil && cfg.RollbackOnStatus(recorder.StatusCode()) {
 			return markRollbackOnly(execCtx, recorder.StatusCode())
@@ -73,7 +73,7 @@ func serve(manager *uow.Manager, cfg Config, next http.Handler, w http.ResponseW
 
 func serveBuffered(manager *uow.Manager, cfg Config, execCfg uow.ExecutionConfig, next http.Handler, w http.ResponseWriter, r *http.Request, baseCtx context.Context) {
 	buffered := newBufferedResponse()
-	runErr := manager.Do(baseCtx, execCfg, func(execCtx context.Context) error {
+	runErr := manager.Run(baseCtx, execCfg, func(execCtx context.Context) error {
 		next.ServeHTTP(buffered, r.WithContext(execCtx))
 		if cfg.RollbackOnStatus != nil && cfg.RollbackOnStatus(buffered.StatusCode()) {
 			return markRollbackOnly(execCtx, buffered.StatusCode())

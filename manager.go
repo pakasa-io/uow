@@ -155,8 +155,13 @@ func (m *Manager) Bind(ctx context.Context, cfg ExecutionConfig) (context.Contex
 	return With(ctx, u), u, nil
 }
 
-// Do executes a managed ambient callback with a propagated UnitOfWork.
-func (m *Manager) Do(ctx context.Context, cfg ExecutionConfig, fn func(ctx context.Context) error) error {
+// Attach resolves or reuses a default execution-scoped UnitOfWork.
+func (m *Manager) Attach(ctx context.Context) (context.Context, UnitOfWork, error) {
+	return m.Bind(ctx, ExecutionConfig{})
+}
+
+// Run executes a managed ambient callback with a propagated UnitOfWork.
+func (m *Manager) Run(ctx context.Context, cfg ExecutionConfig, fn func(ctx context.Context) error) error {
 	if fn == nil {
 		return classifyError(ErrKindConfig, errNilCallback)
 	}
@@ -171,6 +176,11 @@ func (m *Manager) Do(ctx context.Context, cfg ExecutionConfig, fn func(ctx conte
 		return err
 	}
 	return fn(nextCtx)
+}
+
+// Deprecated: use Run.
+func (m *Manager) Do(ctx context.Context, cfg ExecutionConfig, fn func(ctx context.Context) error) error {
+	return m.Run(ctx, cfg, fn)
 }
 
 // InTx executes fn in a root transaction or nested scope.

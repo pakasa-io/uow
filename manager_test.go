@@ -626,28 +626,54 @@ func TestDuplicateFinalizationRejected(t *testing.T) {
 	}
 }
 
-func TestAmbientDoRespectsTransactionMode(t *testing.T) {
+func TestAmbientRunRespectsTransactionMode(t *testing.T) {
 	adapter := newMockAdapter(Capabilities{RootTransaction: true})
 	cfg := DefaultConfig()
 	cfg.TransactionMode = GlobalAuto
 	manager := mustManager(t, cfg, ManagerOptions{}, defaultRegistration(adapter))
 
-	if err := manager.Do(context.Background(), ExecutionConfig{}, func(ctx context.Context) error {
+	if err := manager.Run(context.Background(), ExecutionConfig{}, func(ctx context.Context) error {
 		if !MustFrom(ctx).InTransaction() {
 			t.Fatalf("expected auto transaction")
 		}
 		return nil
 	}); err != nil {
-		t.Fatalf("Do inherit: %v", err)
+		t.Fatalf("Run inherit: %v", err)
 	}
 
-	if err := manager.Do(context.Background(), ExecutionConfig{Transactional: TransactionalOff}, func(ctx context.Context) error {
+	if err := manager.Run(context.Background(), ExecutionConfig{Transactional: TransactionalOff}, func(ctx context.Context) error {
 		if MustFrom(ctx).InTransaction() {
 			t.Fatalf("expected non-transactional execution")
 		}
 		return nil
 	}); err != nil {
-		t.Fatalf("Do off: %v", err)
+		t.Fatalf("Run off: %v", err)
+	}
+}
+
+func TestAttachBindsDefaultUnitOfWork(t *testing.T) {
+	adapter := newMockAdapter(Capabilities{})
+	manager := mustManager(t, DefaultConfig(), ManagerOptions{}, defaultRegistration(adapter))
+
+	ctx, work, err := manager.Attach(nil)
+	if err != nil {
+		t.Fatalf("Attach: %v", err)
+	}
+	if work == nil {
+		t.Fatalf("expected unit of work")
+	}
+	if work.InTransaction() {
+		t.Fatalf("expected non-transactional unit of work")
+	}
+	if work.Binding().AdapterName != "mock" || work.Binding().ClientName != "primary" {
+		t.Fatalf("unexpected binding: %+v", work.Binding())
+	}
+	got, ok := From(ctx)
+	if !ok {
+		t.Fatalf("expected unit of work in context")
+	}
+	if got != work {
+		t.Fatalf("context unit of work mismatch: got %v want %v", got, work)
 	}
 }
 

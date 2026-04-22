@@ -100,7 +100,7 @@ func dispatchBackground(parent context.Context, manager *uow.Manager, evt UserCr
 		}
 		background = uow.WithTenantID(background, "tenant_callbacks")
 
-		result <- manager.Do(background, uow.ExecutionConfig{
+		result <- manager.Run(background, uow.ExecutionConfig{
 			Transactional: uow.TransactionalOn,
 			Label:         "user-created-callback",
 		}, func(ctx context.Context) error {
